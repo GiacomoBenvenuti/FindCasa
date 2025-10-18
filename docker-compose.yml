@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # Development service - keeps container running for VS Code attachment
   findcasa-dev:
-    build: 
+    build:
       context: .
       target: development
     container_name: findcasa-dev
@@ -26,7 +26,7 @@ services:
 
   # Production service - runs the scraper
   findcasa-scraper:
-    build: 
+    build:
       context: .
       target: production
     container_name: findcasa-scraper

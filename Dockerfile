@@ -44,14 +44,8 @@ RUN pip install --no-cache-dir \
     flake8
 
 # Create a development startup script
-RUN echo '#!/bin/bash\n\
-service tor start\n\
-sleep 2\n\
-echo "Development environment ready! Tor is running."\n\
-echo "You can now attach VS Code to this container."\n\
-echo "To run the scraper: python main.py <search_url>"\n\
-tail -f /dev/null\n' > /app/dev-start.sh && \
-chmod +x /app/dev-start.sh
+RUN printf '#!/bin/bash\nservice tor start\nsleep 2\necho "Development environment ready! Tor is running."\necho "You can now attach VS Code to this container."\necho "To run the scraper: python main.py <search_url>"\ntail -f /dev/null\n' > /app/dev-start.sh && \
+    chmod +x /app/dev-start.sh
 
 # Default command for development
 CMD ["/app/dev-start.sh"]
@@ -60,14 +54,11 @@ CMD ["/app/dev-start.sh"]
 FROM base AS production
 
 # Copy application files
-COPY . .
+COPY main.py extract_features.py utils.py ./
 
 # Create a startup script to run Tor and the application
-RUN echo '#!/bin/bash\n\
-service tor start\n\
-sleep 5\n\
-python main.py\n' > /app/start.sh && \
-chmod +x /app/start.sh
+RUN printf '#!/bin/bash\nservice tor start\nsleep 5\npython main.py\n' > /app/start.sh && \
+    chmod +x /app/start.sh
 
 # Run the application
 CMD ["/app/start.sh"]
