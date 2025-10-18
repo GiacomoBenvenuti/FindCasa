@@ -1,8 +1,34 @@
 version: '3.8'
 
 services:
+  # Development service - keeps container running for VS Code attachment
+  findcasa-dev:
+    build: 
+      context: .
+      target: development
+    container_name: findcasa-dev
+    volumes:
+      # Mount source code for live editing
+      - .:/app
+      # Mount data directory
+      - ./data:/app/data
+      # Optional: mount logs directory
+      - ./logs:/app/logs
+    environment:
+      - PYTHONUNBUFFERED=1
+    # Network mode for Tor proxy
+    network_mode: "bridge"
+    # Keep container running
+    command: tail -f /dev/null
+    # Enable TTY for interactive development
+    tty: true
+    stdin_open: true
+
+  # Production service - runs the scraper
   findcasa-scraper:
-    build: .
+    build: 
+      context: .
+      target: production
     container_name: findcasa-scraper
     restart: unless-stopped
     volumes:
@@ -14,6 +40,3 @@ services:
       - PYTHONUNBUFFERED=1
     # Network mode for Tor proxy
     network_mode: "bridge"
-    # If you need to expose ports for debugging
-    # ports:
-    #   - "8080:8080"

@@ -1,5 +1,5 @@
 # Use Python 3.11 slim image as base
-FROM python:3.11-slim
+FROM python:3.11-slim AS base
 
 # Set working directory
 WORKDIR /app
@@ -16,19 +16,51 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Create data directory
 RUN mkdir -p /app/data
 
-# Copy application files
-COPY . .
-
 # Configure Tor
 RUN echo "SocksPort 9050" >> /etc/tor/torrc && \
     echo "ControlPort 9051" >> /etc/tor/torrc
 
-# Expose any ports if needed (optional, for debugging)
-# EXPOSE 8080
-
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
+
+# Development stage
+FROM base AS development
+
+# Install development tools
+RUN apt-get update && apt-get install -y \
+    git \
+    vim \
+    nano \
+    curl \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install additional Python development packages
+RUN pip install --no-cache-dir \
+    ipython \
+    pytest \
+    black \
+    flake8
+
+# Create a development startup script
+RUN echo '#!/bin/bash\n\
+service tor start\n\
+sleep 2\n\
+echo "Development environment ready! Tor is running."\n\
+echo "You can now attach VS Code to this container."\n\
+echo "To run the scraper: python main.py <search_url>"\n\
+tail -f /dev/null\n' > /app/dev-start.sh && \
+chmod +x /app/dev-start.sh
+
+# Default command for development
+CMD ["/app/dev-start.sh"]
+
+# Production stage
+FROM base AS production
+
+# Copy application files
+COPY . .
 
 # Create a startup script to run Tor and the application
 RUN echo '#!/bin/bash\n\

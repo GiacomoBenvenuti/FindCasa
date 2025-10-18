@@ -33,6 +33,31 @@ mkdir -p ./data
 docker run -v $(pwd)/data:/app/data findcasa-scraper
 ```
 
+## Development with VS Code (Recommended for Development)
+
+### Option 1: Using Dev Containers (Best Experience)
+1. Install the "Dev Containers" extension in VS Code
+2. Open this project in VS Code
+3. Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac) and select "Dev Containers: Reopen in Container"
+4. VS Code will automatically build and connect to the development container
+
+### Option 2: Manual Container Attachment
+```bash
+# Start the development container
+docker-compose up -d findcasa-dev
+
+# The container will keep running with Tor proxy ready
+# Attach VS Code to the running container using the Docker extension
+# Or use: docker exec -it findcasa-dev bash
+```
+
+### Development Container Features
+- Pre-installed development tools (git, vim, nano, curl)
+- Python development packages (ipython, pytest, black, flake8)
+- Tor proxy automatically started and configured
+- Live code mounting (changes reflected immediately)
+- VS Code extensions for Python development
+
 ## Manual Setup (Alternative)
 
 ```bash
