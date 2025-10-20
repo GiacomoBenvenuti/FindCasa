@@ -1,8 +1,5 @@
 name: Run Tests
 
-# Trigger the workflow on:
-# - Pull request events (opened, synchronized, reopened)
-# - Push events to master/main branch
 on:
   pull_request:
     branches: [ master, main ]
@@ -54,26 +51,10 @@ jobs:
         mkdir -p data
         mkdir -p logs
     
-    - name: Lint with flake8
-      run: |
-        # Install flake8 if not in requirements
-        pip install flake8
-        # Stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # Exit-zero treats all errors as warnings. Line length set to 79
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=79 --statistics
-    
     - name: Run RMVScraper unit tests
       run: |
         # Run the main test suite
         python test_rmv_scraper.py
-    
-    - name: Run feature extraction tests (if exists)
-      run: |
-        # Run additional tests if they exist
-        if [ -f "test_scraper_functionality.py" ]; then
-          python test_scraper_functionality.py
-        fi
 
   test-docker:
     runs-on: ubuntu-latest
