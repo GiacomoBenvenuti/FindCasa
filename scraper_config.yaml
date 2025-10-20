@@ -1,0 +1,143 @@
+# Rightmove Scraper Configuration
+# This file contains all CSS selectors, class names, and extraction patterns used by the scraper
+# 
+# IMPORTANT: These selectors are specific to Rightmove's current website structure.
+# If Rightmove changes their HTML structure, these selectors may need to be updated.
+
+# Website information
+website:
+  name: "Rightmove"
+  base_url: "https://www.rightmove.co.uk"
+  description: "UK's largest property portal"
+
+# CSS Selectors for property listing pages
+selectors:
+  # Property card containers on search results pages
+  property_cards:
+    container: "PropertyCard_propertyCardContainerWrapper__mcK1Z propertyCard-details"
+    description: "Main container for each property card on search results pages"
+    
+  # Property links within cards
+  property_links:
+    class: "propertyCard-link"
+    description: "Links to individual property detail pages within property cards"
+    
+  # Script tags containing property data
+  script_tags:
+    pattern: "window\\.PAGE_MODEL"
+    description: "Script tags that contain the PAGE_MODEL JavaScript object with property data"
+
+# Regular expressions for data extraction
+regex_patterns:
+  # Pattern to extract JSON data from JavaScript
+  page_model:
+    pattern: "window\\.PAGE_MODEL = (\\{.*\\})"
+    description: "Extracts the JSON object from window.PAGE_MODEL JavaScript variable"
+    group: 1  # Which regex group contains the JSON data
+    
+# URL construction patterns
+url_patterns:
+  # Pagination pattern for search results
+  pagination:
+    pattern: "{base_url}&index={page_index}"
+    description: "URL pattern for paginated search results (page_index = page * 24)"
+    page_size: 24
+    
+  # Property detail page URLs
+  property_detail:
+    pattern: "https://www.rightmove.co.uk{relative_url}"
+    description: "Complete URL for property detail pages using relative URLs from property cards"
+
+# Data processing settings
+data_processing:
+  # Fields to remove from extracted JSON to save memory
+  excluded_fields:
+    - "metadata"
+    - "images" 
+    - "staticMapImgUrls"
+    - "termsOfUse"
+  description: "Property data fields that are excluded to reduce memory usage"
+  
+  # JSON string replacements for Python eval() compatibility
+  # NOTE: Using eval() is not recommended for production. Consider using json.loads() with proper preprocessing.
+  json_replacements:
+    - from: "false"
+      to: "False"
+      description: "Convert JavaScript false to Python False"
+    - from: "true" 
+      to: "True"
+      description: "Convert JavaScript true to Python True"
+    - from: "null"
+      to: "0"
+      description: "Convert JavaScript null to Python 0 (consider using None instead)"
+
+# File naming patterns
+file_patterns:
+  # Output JSON files for individual properties
+  property_json:
+    pattern: "data/id{property_id}.json"
+    description: "File naming pattern for individual property JSON files"
+    
+  # CSV export file
+  csv_export:
+    default_name: "properties.csv"
+    description: "Default filename for CSV exports of property data"
+
+# Request settings
+request_settings:
+  # Timeouts and delays
+  timeouts:
+    page_request: 60  # seconds
+    property_request: 60  # seconds
+    
+  delays:
+    between_requests_min: 1  # seconds
+    between_requests_max: 3  # seconds
+    between_pages_min: 1     # seconds  
+    between_pages_max: 3     # seconds
+    
+  # User agent settings
+  user_agent:
+    use_random: true
+    description: "Whether to use random user agents for requests"
+    
+# Proxy settings
+proxy_settings:
+  tor:
+    http: "socks5h://127.0.0.1:9050"
+    https: "socks5h://127.0.0.1:9050"
+    description: "Tor proxy configuration for anonymous requests"
+
+# Headers for HTTP requests
+http_headers:
+  accept_language: "en-US,en;q=0.9"
+  accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+  connection: "keep-alive"
+  dnt: "1"  # Do Not Track header
+  upgrade_insecure_requests: "1"
+  referer: "https://www.google.com/"  # Fake referer to appear more natural
+
+# Error handling
+error_handling:
+  max_retries: 3
+  retry_delay: 5  # seconds
+  log_errors: true
+  continue_on_error: true
+  description: "Settings for handling request failures and parsing errors"
+
+# Feature extraction configuration
+feature_extraction:
+  # Output directory for JSON files
+  input_directory: "data/"
+  
+  # File filtering
+  file_filter:
+    prefix: "id"
+    suffix: ".json"
+    description: "Only process files that start with 'id' and end with '.json'"
+    
+  # CSV output settings
+  csv_output:
+    filename: "properties.csv"
+    include_index: false
+    description: "Settings for CSV export of extracted features"
