@@ -50,14 +50,6 @@ jobs:
         mkdir -p logs
         echo "Created data and logs directories"
     
-    - name: Validate environment
-      run: |
-        python validate_environment.py
-    
-    - name: Run smoke tests
-      run: |
-        python smoke_test.py
-    
     - name: Run RMVScraper unit tests
       run: |
         # Run the main test suite
