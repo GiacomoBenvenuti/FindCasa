@@ -33,9 +33,12 @@ class TestRMVScraperMethods(unittest.TestCase):
         self.scraper = RMVScraper()
         self.test_dir = tempfile.mkdtemp()
         
-        # Test file paths
-        self.test_page_path = "/app/test/test_page.html"
-        self.listing_card_path = "/app/test/listing_card.html"
+        # Test file paths - use relative paths for both dev container and CI
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        self.test_page_path = os.path.join(
+            script_dir, "test", "test_page.html")
+        self.listing_card_path = os.path.join(
+            script_dir, "test", "listing_card.html")
         
         # Verify test files exist
         self.assertTrue(os.path.exists(self.test_page_path),
@@ -442,7 +445,9 @@ class TestRMVScraperWithRealData(unittest.TestCase):
     def test_end_to_end_listing_extraction(self):
         """Test complete listing extraction pipeline with real HTML."""
         # Read the test page HTML
-        with open("/app/test/test_page.html", 'r', encoding='utf-8') as f:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        test_page_path = os.path.join(script_dir, "test", "test_page.html")
+        with open(test_page_path, 'r', encoding='utf-8') as f:
             html_content = f.read()
         
         # Create mock response
@@ -471,7 +476,10 @@ class TestRMVScraperWithRealData(unittest.TestCase):
     def test_end_to_end_json_parsing(self):
         """Test complete JSON parsing with real property HTML."""
         # Read the listing card HTML
-        with open("/app/test/listing_card.html", 'r', encoding='utf-8') as f:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        listing_card_path = os.path.join(
+            script_dir, "test", "listing_card.html")
+        with open(listing_card_path, 'r', encoding='utf-8') as f:
             html_content = f.read()
         
         # Parse the property data
