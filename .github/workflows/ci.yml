@@ -1,0 +1,91 @@
+name: Automated Testing
+
+# Run tests on PR events and pushes to master
+on:
+  pull_request:
+    branches: [ master, main ]
+  push:
+    branches: [ master, main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Run Unit Tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Create required directories
+      run: |
+        mkdir -p data logs
+    
+    - name: Verify test files exist
+      run: |
+        if [ ! -f "test/test_page.html" ] || [ ! -f "test/listing_card.html" ]; then
+          echo "❌ Test HTML files are missing!"
+          echo "Please ensure test/test_page.html and test/listing_card.html exist"
+          exit 1
+        fi
+        echo "✅ Test HTML files found"
+    
+    - name: Validate YAML configuration
+      run: |
+        python -c "
+        import yaml
+        with open('scraper_config.yaml', 'r') as f:
+            config = yaml.safe_load(f)
+        print('✅ YAML configuration is valid')
+        "
+    
+    - name: Run RMVScraper tests
+      run: |
+        echo "🧪 Running comprehensive RMVScraper test suite..."
+        python test_rmv_scraper.py
+    
+    - name: Run additional tests (if available)
+      run: |
+        if [ -f "test_scraper_functionality.py" ]; then
+          echo "🧪 Running additional functionality tests..."
+          python test_scraper_functionality.py
+        else
+          echo "ℹ️ No additional test files found, skipping..."
+        fi
+    
+    - name: Test summary
+      if: success()
+      run: |
+        echo "✅ All tests passed successfully!"
+        echo "The RMVScraper is ready for production use."
+    
+    - name: Failure notification
+      if: failure()
+      run: |
+        echo "❌ Tests failed!"
+        echo ""
+        echo "Common issues to check:"
+        echo "1. Missing or corrupted test HTML files in test/ directory"
+        echo "2. YAML configuration file syntax errors"
+        echo "3. Missing dependencies in requirements.txt"
+        echo "4. Python import or path issues"
+        echo ""
+        echo "Please review the test output above and fix any issues before merging."
+        exit 1
