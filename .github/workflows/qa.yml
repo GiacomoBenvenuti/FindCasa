@@ -1,0 +1,310 @@
+name: Quality Assurance
+
+# This workflow runs comprehensive testing and quality checks
+on:
+  pull_request:
+    branches: [ master, main ]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [ master, main ]
+  workflow_dispatch:  # Allow manual triggering
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  pre-commit-checks:
+    runs-on: ubuntu-latest
+    name: Pre-commit Quality Checks
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install pre-commit dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 black isort mypy
+    
+    - name: Check code formatting with Black
+      run: |
+        black --check --diff .
+      continue-on-error: true
+    
+    - name: Check import sorting with isort
+      run: |
+        isort --check-only --diff .
+      continue-on-error: true
+    
+    - name: Run flake8 linting
+      run: |
+        # Stop on syntax errors and undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Check all other issues but don't fail the build
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=79 --statistics
+    
+    - name: Type checking with mypy (optional)
+      run: |
+        mypy . --ignore-missing-imports --show-error-codes
+      continue-on-error: true
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    needs: pre-commit-checks
+    name: Unit Tests (Python ${{ matrix.python-version }})
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/pip
+          ~/.cache/pypoetry
+        key: ${{ runner.os }}-python-${{ matrix.python-version }}-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-python-${{ matrix.python-version }}-
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y tor curl wget
+        # Configure tor for testing (without starting the service)
+        sudo mkdir -p /etc/tor
+        echo "SocksPort 9050" | sudo tee -a /etc/tor/torrc
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip setuptools wheel
+        pip install -r requirements.txt
+        # Install testing utilities
+        pip install pytest pytest-cov pytest-mock pytest-xvfb coverage
+    
+    - name: Verify installation
+      run: |
+        python --version
+        pip list
+        python -c "import yaml; print('PyYAML installed successfully')"
+        python -c "import requests; print('Requests installed successfully')"
+        python -c "from bs4 import BeautifulSoup; print('BeautifulSoup installed successfully')"
+    
+    - name: Create required directories and files
+      run: |
+        mkdir -p data logs test
+        # Ensure test HTML files exist (create dummy ones if missing)
+        if [ ! -f "test/test_page.html" ]; then
+          echo "Creating dummy test_page.html for testing"
+          mkdir -p test
+          echo '<!DOCTYPE html><html><body><div class="PropertyCard_propertyCardContainerWrapper__mcK1Z propertyCard-details"><a class="propertyCard-link" href="/properties/123456">Test Property</a></div></body></html>' > test/test_page.html
+        fi
+        if [ ! -f "test/listing_card.html" ]; then
+          echo "Creating dummy listing_card.html for testing"
+          echo '<!DOCTYPE html><html><head><title>Test Property</title></head><body><script>window.PAGE_MODEL = {"propertyData":{"id":"165672272","status":{"published":true,"archived":false},"prices":{"primaryPrice":500000}}};</script></body></html>' > test/listing_card.html
+        fi
+    
+    - name: Validate configuration files
+      run: |
+        # Check if YAML config file is valid
+        python -c "
+        import yaml
+        try:
+            with open('scraper_config.yaml', 'r') as f:
+                config = yaml.safe_load(f)
+            print('✓ YAML configuration is valid')
+            print(f'Configuration sections: {list(config.keys())}')
+        except Exception as e:
+            print(f'✗ YAML configuration error: {e}')
+            exit(1)
+        "
+    
+    - name: Run comprehensive unit tests
+      run: |
+        echo "Running RMVScraper comprehensive test suite..."
+        python test_rmv_scraper.py
+        
+        echo "Running additional functionality tests (if available)..."
+        if [ -f "test_scraper_functionality.py" ]; then
+          python test_scraper_functionality.py
+        else
+          echo "No additional functionality tests found, skipping..."
+        fi
+    
+    - name: Run tests with pytest and coverage
+      run: |
+        # Run pytest if any test files exist
+        if ls test_*.py 1> /dev/null 2>&1; then
+          echo "Running tests with pytest and generating coverage report..."
+          coverage run -m pytest -v --tb=short
+          coverage report --show-missing
+          coverage xml
+        else
+          echo "No pytest-compatible test files found"
+        fi
+    
+    - name: Upload coverage reports
+      if: matrix.python-version == '3.11'
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+        verbose: true
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    name: Integration Tests
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Test configuration loading
+      run: |
+        python -c "
+        from config_loader import get_config
+        config = get_config()
+        print('✓ Configuration loaded successfully')
+        print('Available config sections:', list(config.config.keys()))
+        "
+    
+    - name: Test scraper initialization
+      run: |
+        python -c "
+        from main import RMVScraper
+        scraper = RMVScraper()
+        print('✓ RMVScraper initialized successfully')
+        print('Config loaded:', scraper.config is not None)
+        print('Headers set:', bool(scraper.headers))
+        "
+    
+    - name: Test feature extraction (if available)
+      run: |
+        if [ -f "extract_features.py" ]; then
+          python -c "
+          import extract_features
+          print('✓ Feature extraction module imported successfully')
+          "
+        fi
+
+  docker-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    name: Docker Environment Tests
+    if: github.event_name == 'push' # Only run on push to avoid redundant PR runs
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Check if Docker files exist
+      id: docker-check
+      run: |
+        if [ -f "Dockerfile" ]; then
+          echo "dockerfile_exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "dockerfile_exists=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Build Docker image
+      if: steps.docker-check.outputs.dockerfile_exists == 'true'
+      run: |
+        docker build -t findcasa-scraper:test .
+    
+    - name: Run tests in Docker
+      if: steps.docker-check.outputs.dockerfile_exists == 'true'
+      run: |
+        docker run --rm \
+          -v $(pwd)/test:/app/test \
+          findcasa-scraper:test \
+          python test_rmv_scraper.py
+
+  security-scan:
+    runs-on: ubuntu-latest
+    name: Security Scan
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install security tools
+      run: |
+        pip install safety bandit
+    
+    - name: Check for known security vulnerabilities
+      run: |
+        safety check --json || true
+    
+    - name: Run bandit security linter
+      run: |
+        bandit -r . -f json || true
+
+  summary:
+    runs-on: ubuntu-latest
+    needs: [pre-commit-checks, unit-tests, integration-tests]
+    if: always()
+    name: Test Summary
+    
+    steps:
+    - name: Summarize results
+      run: |
+        echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ needs.pre-commit-checks.result }}" == "success" ]; then
+          echo "✅ **Pre-commit checks**: Passed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Pre-commit checks**: Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.unit-tests.result }}" == "success" ]; then
+          echo "✅ **Unit tests**: Passed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Unit tests**: Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.integration-tests.result }}" == "success" ]; then
+          echo "✅ **Integration tests**: Passed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Integration tests**: Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+        echo "- Review any failed tests above" >> $GITHUB_STEP_SUMMARY
+        echo "- Check the detailed logs for specific error messages" >> $GITHUB_STEP_SUMMARY
+        echo "- Ensure all dependencies are properly listed in requirements.txt" >> $GITHUB_STEP_SUMMARY
+    
+    - name: Fail if critical tests failed
+      if: needs.unit-tests.result == 'failure'
+      run: |
+        echo "Critical tests failed. Please fix the issues before merging."
+        exit 1

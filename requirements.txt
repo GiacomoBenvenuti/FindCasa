@@ -2,3 +2,4 @@ requests[socks]
 fake_useragent
 beautifulsoup4 
 pandas
+PyYAML
